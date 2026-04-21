@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Torneo Calcio</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f4f4f4; }
+    .admin { display:none; border:1px solid #ccc; padding:15px; }
+    .login { border:1px solid #ccc; padding:15px; width:250px; }
+    button { padding: 8px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<h1>Torneo di Calcio</h1>
+
+<div id="loginBox" class="login">
+  <h3>Login Admin</h3>
+  Username: <input id="user"><br>
+  Password: <input id="pass" type="password"><br><br>
+  <button onclick="login()">Login</button>
+</div>
+
+<h2>Filtra squadra</h2>
+<select id="filtroSquadra" onchange="renderCalendario()">
+  <option value="tutte">Tutte</option>
+</select>
+
+<h2>Classifica Girone A</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Squadra</th><th>Punti</th><th>GF</th><th>GS</th><th>Diff</th>
+    </tr>
+  </thead>
+  <tbody id="classificaA"></tbody>
+</table>
+
+<h2>Classifica Girone B</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Squadra</th><th>Punti</th><th>GF</th><th>GS</th><th>Diff</th>
+    </tr>
+  </thead>
+  <tbody id="classificaB"></tbody>
+</table>
+
+<h2>Marcatori</h2>
+<table>
+  <thead><tr><th>Giocatore</th><th>Gol</th></tr></thead>
+  <tbody id="marcatori"></tbody>
+</table>
+
+<h2>Partite</h2>
+<table>
+  <thead><tr><th>Casa</th><th>Ospite</th></tr></thead>
+  <tbody id="calendario"></tbody>
+</table>
+
+<div id="adminPanel" class="admin">
+  <h2>Admin</h2>
+
+  <select id="matchSelect"></select><br><br>
+
+  Gol Casa: <input id="golCasa" type="number"><br>
+  Gol Ospite: <input id="golOspite" type="number"><br>
+
+  Marcatori (nome,gol; nome,gol):<br>
+  <input id="marcatoriInput" style="width:100%"><br><br>
+
+  <button onclick="salvaRisultato()">Salva Risultato</button>
+
+  <br><br>
+
+  <button onclick="resetTorneo()" style="background:red; color:white;">
+    RESET TORNEO
+  </button>
+</div>
+
+<script>
+// 🔥 CONFIG FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyArVbgUyuZ1GROO9kAo6sEh9CQTCX8U22U",
+  authDomain: "torneo-prova-1.firebaseapp.com",
+  projectId: "torneo-prova-1"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let squadre = [];
+let partite = [];
+let marcatori = {};
+
+function login() {
+  if(user.value === "pippo" && pass.value === "pippo") {
+    adminPanel.style.display = "block";
+    loginBox.style.display = "none";
+  } else {
+    alert("Credenziali errate");
+  }
+}
+
+async function caricaDati() {
+  const s = await db.collection("squadre").get();
+  squadre = s.docs.map(d=>d.data());
+
+  const p = await db.collection("partite").get();
+  partite = p.docs.map(d=>({id:d.id, ...d.data()}));
+
+  const m = await db.collection("marcatori").get();
+  marcatori = {};
+  m.forEach(doc=> marcatori[doc.id] = doc.data().gol);
+
+  renderAll();
+}
+
+function renderAll() {
+  renderFiltro();
+  renderClassifiche();
+  renderMarcatori();
+  renderCalendario();
+  renderAdmin();
+}
+
+function renderFiltro() {
+  filtroSquadra.innerHTML = '<option value="tutte">Tutte</option>';
+  squadre.forEach(s=> filtroSquadra.innerHTML += `<option>${s.nome}</option>`);
+}
+
+function renderClassifiche() {
+  const A = squadre.filter(s => s.girone === "A");
+  const B = squadre.filter(s => s.girone === "B");
+
+  renderSingola(A, "classificaA");
+  renderSingola(B, "classificaB");
+}
+
+function renderSingola(lista, id) {
+  const tbody = document.getElementById(id);
+  tbody.innerHTML = "";
+
+  lista.sort((a,b)=>
+    (b.punti||0)-(a.punti||0) ||
+    ((b.gf||0)-(b.gs||0)) - ((a.gf||0)-(a.gs||0))
+  );
+
+  lista.forEach(s=>{
+    const diff = (s.gf||0)-(s.gs||0);
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${s.nome}</td>
+        <td>${s.punti||0}</td>
+        <td>${s.gf||0}</td>
+        <td>${s.gs||0}</td>
+        <td>${diff}</td>
+      </tr>
+    `;
+  });
+}
+
+function renderMarcatori() {
+  const tbody = document.getElementById("marcatori");
+  tbody.innerHTML = "";
+
+  Object.entries(marcatori)
+    .sort((a,b)=>b[1]-a[1])
+    .forEach(([nome,gol])=>{
+      tbody.innerHTML += `<tr><td>${nome}</td><td>${gol}</td></tr>`;
+    });
+}
+
+function renderCalendario() {
+  calendario.innerHTML = "";
+  const filtro = filtroSquadra.value;
+
+  partite.forEach(p=>{
+    if(filtro==='tutte' || p.casa===filtro || p.ospite===filtro)
+      calendario.innerHTML += `<tr><td>${p.casa}</td><td>${p.ospite}</td></tr>`;
+  });
+}
+
+function renderAdmin() {
+  matchSelect.innerHTML = "";
+  partite.filter(p=>!p.giocata).forEach(p=>{
+    matchSelect.innerHTML += `<option value="${p.id}">${p.casa}-${p.ospite}</option>`;
+  });
+}
+
+async function salvaRisultato() {
+  const id = matchSelect.value;
+  const gC = parseInt(golCasa.value);
+  const gO = parseInt(golOspite.value);
+
+  const partita = partite.find(p => p.id === id);
+
+  await db.collection("partite").doc(id).update({
+    giocata:true,
+    gC,
+    gO
+  });
+
+  const casa = squadre.find(s => s.nome === partita.casa);
+  const ospite = squadre.find(s => s.nome === partita.ospite);
+
+  casa.gf = (casa.gf||0) + gC;
+  casa.gs = (casa.gs||0) + gO;
+
+  ospite.gf = (ospite.gf||0) + gO;
+  ospite.gs = (ospite.gs||0) + gC;
+
+  if (gC > gO) casa.punti = (casa.punti||0) + 3;
+  else if (gO > gC) ospite.punti = (ospite.punti||0) + 3;
+  else {
+    casa.punti = (casa.punti||0) + 1;
+    ospite.punti = (ospite.punti||0) + 1;
+  }
+
+  await db.collection("squadre").doc(casa.nome).set(casa);
+  await db.collection("squadre").doc(ospite.nome).set(ospite);
+
+  marcatoriInput.value.split(";").forEach(async m=>{
+    let [nome,gol] = m.split(",");
+    gol = parseInt(gol);
+
+    const ref = db.collection("marcatori").doc(nome.trim());
+    const doc = await ref.get();
+
+    if(doc.exists)
+      ref.update({ gol: doc.data().gol + gol });
+    else
+      ref.set({ gol });
+  });
+
+  caricaDati();
+}
+
+async function resetTorneo() {
+  const conferma = confirm("Sei sicuro di voler resettare tutto il torneo?");
+  if (!conferma) return;
+
+  for (let s of squadre) {
+    s.punti = 0;
+    s.gf = 0;
+    s.gs = 0;
+    await db.collection("squadre").doc(s.nome).set(s);
+  }
+
+  for (let p of partite) {
+    await db.collection("partite").doc(p.id).update({
+      giocata: false,
+      gC: 0,
+      gO: 0
+    });
+  }
+
+  const snapshot = await db.collection("marcatori").get();
+  for (let doc of snapshot.docs) {
+    await db.collection("marcatori").doc(doc.id).delete();
+  }
+
+  alert("Torneo resettato!");
+  caricaDati();
+}
+
+caricaDati();
+</script>
+
+</body>
+</html>
