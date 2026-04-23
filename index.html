@@ -60,15 +60,39 @@
     }
 
     input { margin:5px 0; padding:5px; width:100%; }
+
+    /* NUOVO: header partite + filtro */
+    .partite-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* NUOVO: eliminazioni */
+    .eliminazioni {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .eliminazioni img {
+      max-width: 100%;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+  .played {
+    background: #e0f2fe;
+  }
+
+  .not-played {
+    background: #fef9c3;
+  }
   </style>
 </head>
 
 <body>
 
 <h1>🏆 SEVEN GAZZERA CUP 🏆</h1>
-
-<h2>Filtra squadra</h2>
-<select id="filtroSquadra" onchange="renderCalendario()"></select>
 
 <h2>🐭 GIRONE DELLA NUTRIA</h2>
 <table>
@@ -86,15 +110,40 @@
   <tbody id="classificaB"></tbody>
 </table>
 
+<!-- NUOVO BLOCCO -->
+<div class="eliminazioni">
+  <h2>🏆 FASI AD ELIMINAZIONE</h2>
+  <img src="https://raw.githubusercontent.com/filippocortella/SevenGazzeraCup/refs/heads/main/eliminazioni.png">
+</div>
+
 <h2>⚽ Marcatori</h2>
 <table>
+  <thead>
+    <tr>
+      <th>Cognome giocatore</th>
+      <th>N. gol</th>
+    </tr>
+  </thead>
   <tbody id="marcatori"></tbody>
 </table>
 
-<h2>📅 Partite</h2>
+<!-- HEADER PARTITE + FILTRO -->
+<div class="partite-header">
+  <h2>📅 Partite</h2>
+
+  <select id="filtroSquadra" onchange="renderCalendario()">
+    <option value="tutte">Tutte</option>
+  </select>
+</div>
+
 <table>
   <thead>
-    <tr><th>Ora</th><th>Casa</th><th>Ospite</th></tr>
+    <tr>
+  <th>Data</th>
+  <th>Ora</th>
+  <th>Casa</th>
+  <th>Ospite</th>
+</tr>
   </thead>
   <tbody id="calendario"></tbody>
 </table>
@@ -124,6 +173,13 @@
   </div>
 </footer>
 
+<!-- JS NON TOCCATO -->
+<script>
+/* 👉 LASCIA TUTTO IL TUO SCRIPT IDENTICO QUI */
+</script>
+
+</body>
+</html>
 <script>
 
 const firebaseConfig = {
@@ -242,23 +298,35 @@ function renderMarcatori(){
 
 // CALENDARIO
 function renderCalendario(){
-  const tbody=document.getElementById("calendario");
-  tbody.innerHTML="";
+  const tbody = document.getElementById("calendario");
+  tbody.innerHTML = "";
 
-  const filtro=filtroSquadra.value;
+  // 🔥 ORDINA PER DATA + ORA
+  const sorted = [...partite].sort((a, b) => {
+    const [gA, mA] = (a.data || "00/00").split("/");
+    const [gB, mB] = (b.data || "00/00").split("/");
 
-  partite
-    .filter(p=> filtro==="tutte" || p.casa===filtro || p.ospite===filtro)
-    .forEach(p=>{
-      tbody.innerHTML+=`
-        <tr>
-          <td>${p.ora||"-"}</td>
-          <td>${teamHTML(p.casa)}</td>
-          <td>${teamHTML(p.ospite)}</td>
-        </tr>`;
-    });
+    const dataA = new Date(2025, mA-1, gA, ...(a.ora || "00:00").split(":"));
+    const dataB = new Date(2025, mB-1, gB, ...(b.ora || "00:00").split(":"));
+
+    return dataA - dataB;
+  });
+
+  // 🔥 RENDER
+  sorted.forEach(p => {
+
+    const classe = p.giocata ? "played" : "not-played";
+
+    tbody.innerHTML += `
+      <tr class="${classe}">
+        <td>${p.data || "-"}</td>
+        <td>${p.ora || "-"}</td>
+        <td>${teamHTML(p.casa)}</td>
+        <td>${teamHTML(p.ospite)}</td>
+      </tr>
+    `;
+  });
 }
-
 // ADMIN FIX
 function renderAdmin(){
   const select=document.getElementById("matchSelect");
