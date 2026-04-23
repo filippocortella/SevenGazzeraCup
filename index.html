@@ -301,8 +301,17 @@ function renderCalendario(){
   const tbody = document.getElementById("calendario");
   tbody.innerHTML = "";
 
-  // 🔥 ORDINA PER DATA + ORA
-  const sorted = [...partite].sort((a, b) => {
+  const filtro = document.getElementById("filtroSquadra").value;
+
+  // 🔥 FILTRO
+  let filtrate = partite.filter(p =>
+    filtro === "tutte" ||
+    p.casa === filtro ||
+    p.ospite === filtro
+  );
+
+  // 🔥 ORDINA DOPO IL FILTRO
+  const sorted = filtrate.sort((a, b) => {
     const [gA, mA] = (a.data || "00/00").split("/");
     const [gB, mB] = (b.data || "00/00").split("/");
 
@@ -327,6 +336,7 @@ function renderCalendario(){
     `;
   });
 }
+
 // ADMIN FIX
 function renderAdmin(){
   const select=document.getElementById("matchSelect");
