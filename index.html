@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Calendario Squadra</title>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+</head>
+<body>
+
+  <h1>Calendario Squadra ⚽</h1>
+  <div id="calendar"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "TUO_API_KEY",
+      authDomain: "TUO_PROGETTO.firebaseapp.com",
+      projectId: "TUO_PROGETTO_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function loadEvents() {
+      const snapshot = await getDocs(collection(db, "eventi"));
+      let eventi = [];
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        eventi.push({
+          title: data.titolo,
+          start: data.data + "T" + data.ora
+        });
+      });
+
+      return eventi;
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+      const calendarEl = document.getElementById('calendar');
+      const eventi = await loadEvents();
+
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        events: eventi
+      });
+
+      calendar.render();
+    });
+  </script>
+
+</body>
+</html>
